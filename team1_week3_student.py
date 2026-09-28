@@ -186,9 +186,13 @@ def get_financials(ticker: str) -> list[dict]:
     # Only add a value to fields if it is not None.
 
     fields = {}
-
-    # YOUR CODE HERE
-
+    for name in ("last_price", "market_cap", "year_high", "year_low"):
+        try:
+            value = getattr(fast, name)
+        except Exception:
+            continue
+        if value is not None:
+            fields[name] = value
 
     if not fields:
         return [{"error": f"No financial snapshot returned for {ticker}."}]
@@ -282,8 +286,29 @@ def get_sec_filings(ticker: str) -> list[dict]:
     # Hint:
     # zip(forms, dates, accessions, documents)
 
-    # YOUR CODE HERE
+    for form, date, accession, document in zip(
+        forms, dates, accessions, documents
+    ):
+        if form not in {"10-K", "10-Q", "8-K"}:
+            continue
 
+        accession_without_dashes = str(accession).replace("-", "")
+        url = (
+            "https://www.sec.gov/Archives/edgar/data/"
+            f"{int(cik)}/{accession_without_dashes}/{document}"
+        )
+        results.append(
+            {
+                "title": f"{ticker} {form} ({date})",
+                "url": url,
+                "content": (
+                    f"{form} filed on {date}. "
+                    f"Accession number {accession}."
+                ),
+            }
+        )
+        if len(results) >= 3:
+            break
 
     return results or [
         {"error": f"No recent 10-K, 10-Q, or 8-K found for {ticker}."}
@@ -334,8 +359,28 @@ def research_node(state: ResearchState) -> dict:
     # Research ALL Planner tasks.
     # Do not use research_plan[0].
 
-    # YOUR CODE HERE
+    for item in state["research_plan"]:
+        task = item["task"]
+        source_type = item["source_type"]
+        ticker = item.get("ticker")
 
+        if source_type == "web":
+            results = search_web(task)
+        elif source_type == "financials":
+            results = get_financials(ticker)
+        elif source_type == "filings":
+            results = get_sec_filings(ticker)
+        else:
+            results = [{"error": f"Unknown source type: {source_type}"}]
+
+        research_results.append(
+            {
+                "task": task,
+                "source_type": source_type,
+                "ticker": ticker,
+                "results": results,
+            }
+        )
 
     return {"research_results": research_results}
 
