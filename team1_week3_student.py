@@ -187,7 +187,44 @@ def get_financials(ticker: str) -> list[dict]:
 
     fields = {}
 
-    # YOUR CODE HERE
+    try:
+        value = getattr(fast, "last_price")
+        if value is not None:
+            fields["last_price"] = value
+    except Exception:
+        pass
+
+    try:
+        value = getattr(fast, "market_cap")
+        if value is not None:
+            fields["market_cap"] = value
+    except Exception:
+        pass
+
+    try:
+        value = getattr(fast, "year_high")
+        if value is not None:
+            fields["year_high"] = value
+    except Exception:
+        pass
+
+    try:
+        value = getattr(fast, "year_low")
+        if value is not None:
+            fields["year_low"] = value
+    except Exception:
+        pass
+
+    if not fields:
+        return [{"error": f"No financial snapshot returned for {ticker}."}]
+
+    return [
+        {
+            "title": f"{ticker} market snapshot",
+            "url": f"https://finance.yahoo.com/quote/{ticker}",
+            "content": json.dumps(fields, default=str),
+        }
+    ]
 
 
     if not fields:
@@ -282,7 +319,29 @@ def get_sec_filings(ticker: str) -> list[dict]:
     # Hint:
     # zip(forms, dates, accessions, documents)
 
-    # YOUR CODE HERE
+    for form, date, accession, document in zip(
+        forms, dates, accessions, documents
+    ):
+        if form not in {"10-K", "10-Q", "8-K"}:
+            continue
+
+        accession_no_dashes = accession.replace("-", "")
+
+        url = (
+            f"https://www.sec.gov/Archives/edgar/data/"
+            f"{int(cik)}/{accession_no_dashes}/{document}"
+        )
+
+        results.append(
+            {
+                "title": f"{ticker} {form} filed {date}",
+                "url": url,
+                "content": f"{form} filed on {date}",
+            }
+        )
+
+        if len(results) >= 3:
+            break
 
 
     return results or [
@@ -334,8 +393,31 @@ def research_node(state: ResearchState) -> dict:
     # Research ALL Planner tasks.
     # Do not use research_plan[0].
 
-    # YOUR CODE HERE
+    for item in state["research_plan"]:
+        task = item["task"]
+        source_type = item["source_type"]
+        ticker = item.get("ticker")
 
+        if source_type == "web":
+            results = search_web(task)
+
+        elif source_type == "financials":
+            results = get_financials(ticker)
+
+        elif source_type == "filings":
+            results = get_sec_filings(ticker)
+
+        else:
+            results = [{"error": f"Unknown source type: {source_type}"}]
+
+        research_results.append(
+            {
+                "task": task,
+                "source_type": source_type,
+                "ticker": ticker,
+                "results": results,
+            }
+        )
 
     return {"research_results": research_results}
 
