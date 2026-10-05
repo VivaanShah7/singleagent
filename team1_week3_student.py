@@ -186,46 +186,13 @@ def get_financials(ticker: str) -> list[dict]:
     # Only add a value to fields if it is not None.
 
     fields = {}
-
-    try:
-        value = getattr(fast, "last_price")
+    for name in ("last_price", "market_cap", "year_high", "year_low"):
+        try:
+            value = getattr(fast, name)
+        except Exception:
+            continue
         if value is not None:
-            fields["last_price"] = value
-    except Exception:
-        pass
-
-    try:
-        value = getattr(fast, "market_cap")
-        if value is not None:
-            fields["market_cap"] = value
-    except Exception:
-        pass
-
-    try:
-        value = getattr(fast, "year_high")
-        if value is not None:
-            fields["year_high"] = value
-    except Exception:
-        pass
-
-    try:
-        value = getattr(fast, "year_low")
-        if value is not None:
-            fields["year_low"] = value
-    except Exception:
-        pass
-
-    if not fields:
-        return [{"error": f"No financial snapshot returned for {ticker}."}]
-
-    return [
-        {
-            "title": f"{ticker} market snapshot",
-            "url": f"https://finance.yahoo.com/quote/{ticker}",
-            "content": json.dumps(fields, default=str),
-        }
-    ]
-
+            fields[name] = value
 
     if not fields:
         return [{"error": f"No financial snapshot returned for {ticker}."}]
@@ -325,24 +292,23 @@ def get_sec_filings(ticker: str) -> list[dict]:
         if form not in {"10-K", "10-Q", "8-K"}:
             continue
 
-        accession_no_dashes = accession.replace("-", "")
-
+        accession_without_dashes = str(accession).replace("-", "")
         url = (
-            f"https://www.sec.gov/Archives/edgar/data/"
-            f"{int(cik)}/{accession_no_dashes}/{document}"
+            "https://www.sec.gov/Archives/edgar/data/"
+            f"{int(cik)}/{accession_without_dashes}/{document}"
         )
-
         results.append(
             {
-                "title": f"{ticker} {form} filed {date}",
+                "title": f"{ticker} {form} ({date})",
                 "url": url,
-                "content": f"{form} filed on {date}",
+                "content": (
+                    f"{form} filed on {date}. "
+                    f"Accession number {accession}."
+                ),
             }
         )
-
         if len(results) >= 3:
             break
-
 
     return results or [
         {"error": f"No recent 10-K, 10-Q, or 8-K found for {ticker}."}
@@ -400,13 +366,10 @@ def research_node(state: ResearchState) -> dict:
 
         if source_type == "web":
             results = search_web(task)
-
         elif source_type == "financials":
             results = get_financials(ticker)
-
         elif source_type == "filings":
             results = get_sec_filings(ticker)
-
         else:
             results = [{"error": f"Unknown source type: {source_type}"}]
 
